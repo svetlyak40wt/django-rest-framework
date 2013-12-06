@@ -52,7 +52,15 @@ class _MediaType(object):
         self.main_type, sep, self.sub_type = self.full_type.partition('/')
 
     def match(self, other):
-        """Return true if this MediaType satisfies the given MediaType."""
+        """Return true if this MediaType satisfies the given MediaType.
+        Note, this method is not transient:
+        
+        _MediaType('application/json').match(_MediaType('application/json; indent=4')) -> False
+
+        but
+        
+        _MediaType('application/json; indent=4').match(_MediaType('application/json')) -> True
+        """
         for key in self.params.keys():
             if key != 'q' and other.params.get(key, None) != self.params.get(key, None):
                 return False
@@ -70,13 +78,14 @@ class _MediaType(object):
         """
         Return a precedence level from 0-3 for the media type given how specific it is.
         """
-        if self.main_type == '*':
-            return 0
-        elif self.sub_type == '*':
-            return 1
-        elif not self.params or self.params.keys() == ['q']:
-            return 2
-        return 3
+        params = self.params or {}
+        params = params.copy()
+        quality = float(params.pop('q', '1'))
+        return (
+            self.main_type != '*',
+            self.sub_type != '*',
+            len(params) > 0,
+            quality)
 
     def __str__(self):
         return unicode(self).encode('utf-8')
@@ -86,3 +95,7 @@ class _MediaType(object):
         for key, val in self.params.items():
             ret += "; %s=%s" % (key, val)
         return ret
+
+    def __repr__(self):
+        return "%s('%s')" % (self.__class__.__name__, self.orig)
+
