@@ -26,21 +26,7 @@ def media_type_matches(lhs, rhs):
     return lhs.match(rhs)
 
 
-def order_by_precedence(media_type_lst):
-    """
-    Returns a list of sets of media type strings, ordered by precedence.
-    Precedence is determined by how specific a media type is:
-
-    3. 'type/subtype; param=val'
-    2. 'type/subtype'
-    1. 'type/*'
-    0. '*/*'
-    """
-    ret = [set(), set(), set(), set()]
-    for media_type in media_type_lst:
-        precedence = _MediaType(media_type).precedence
-        ret[3 - precedence].add(media_type)
-    return [media_types for media_types in ret if media_types]
+_NOT_GIVEN = object()
 
 
 class _MediaType(object):
@@ -49,20 +35,28 @@ class _MediaType(object):
             media_type_str = ''
         self.orig = media_type_str
         self.full_type, self.params = parse_header(media_type_str.encode(HTTP_HEADER_ENCODING))
+        
+        self.quality = self.params.pop('q', _NOT_GIVEN)
+        self.quality_not_given = self.quality is _NOT_GIVEN
+        if self.quality_not_given:
+            self.quality = 1.0
+        else:
+            self.quality = float(self.quality)
+
         self.main_type, sep, self.sub_type = self.full_type.partition('/')
 
     def match(self, other):
         """Return true if this MediaType satisfies the given MediaType.
         Note, this method is not transient:
         
-        _MediaType('application/json').match(_MediaType('application/json; indent=4')) -> False
+        _MediaType('application/json').match(_MediaType('application/json; indent=4')) -> True
 
         but
         
-        _MediaType('application/json; indent=4').match(_MediaType('application/json')) -> True
+        _MediaType('application/json; indent=4').match(_MediaType('application/json')) -> False
         """
         for key in self.params.keys():
-            if key != 'q' and other.params.get(key, None) != self.params.get(key, None):
+            if other.params.get(key, None) != self.params[key]:
                 return False
 
         if self.sub_type != '*' and other.sub_type != '*'  and other.sub_type != self.sub_type:
@@ -78,23 +72,22 @@ class _MediaType(object):
         """
         Return a precedence level from 0-3 for the media type given how specific it is.
         """
-        params = self.params or {}
-        params = params.copy()
-        quality = float(params.pop('q', '1'))
         return (
             self.main_type != '*',
             self.sub_type != '*',
-            len(params) > 0,
-            quality)
+            len(self.params) > 0,
+            self.quality)
 
     def __str__(self):
         return unicode(self).encode('utf-8')
 
     def __unicode__(self):
-        ret = "%s/%s" % (self.main_type, self.sub_type)
-        for key, val in self.params.items():
-            ret += "; %s=%s" % (key, val)
-        return ret
+        ret = [u'%s/%s' % (self.main_type, self.sub_type)]
+        if not self.quality_not_given:
+            ret.append(u'q=%s' % self.quality)
+        for item in self.params.items():
+            ret.append(u'%s=%s' % item)
+        return u'; '.join(ret)
 
     def __repr__(self):
         return "%s('%s')" % (self.__class__.__name__, self.orig)

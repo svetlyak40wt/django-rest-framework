@@ -55,6 +55,10 @@ class TestAcceptedMediaType(TestCase):
         accepted_renderer, accepted_media_type = self.select_renderer(request)
         self.assertEqual(u'text/html', accepted_media_type)
 
+    def test_media_type_serializes_with_all_params_and_quality(self):
+        self.assertEqual(
+            u'plain/text; q=0.7; width=80; all=yes',
+            unicode(_MediaType(u'plain/text;width=80;all=yes;q=0.7')))
         
     def test_media_type_match(self):
         def match(one, another):

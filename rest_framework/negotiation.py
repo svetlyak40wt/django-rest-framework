@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 from django.http import Http404
 from rest_framework import exceptions
 from rest_framework.settings import api_settings
-from rest_framework.utils.mediatypes import order_by_precedence, media_type_matches
+from rest_framework.utils.mediatypes import media_type_matches
 from rest_framework.utils.mediatypes import _MediaType
 
 
